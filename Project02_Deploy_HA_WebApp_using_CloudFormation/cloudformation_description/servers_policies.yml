@@ -34,15 +34,15 @@ Resources:
                     - s3:Get*
                     - s3:List*
                   Resource: 
-                    - arn:aws:s3:::c3pipelines-devops
-                    - arn:aws:s3:::c3pipelines-devops/*
+                    - arn:aws:s3:::${P_S3_Bucket_Name}
+                    - arn:aws:s3:::${P_S3_Bucket_Name}/*
 
 
   SECGROUP_WebServer:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow http and ssh to our load balancer
-        VpcId: !Ref VPC_HA_WebApp
+        VpcId: Fn::ImportValue: !Sub "${EnvironmentName}_VPC_HA_WebApp"
           SecurityGroupIngress:
             - IpProtocol: tcp
               FromPort: 80
@@ -53,6 +53,23 @@ Resources:
               FromPort: 0
               ToPort: 65535
               CidrIp: 0.0.0.0/0
+
+  
+   SECGROUP_LoadBalancer:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Allow http traffic to and from load balancer
+        VpcId: Fn::ImportValue: !Sub "${EnvironmentName}_VPC_HA_WebApp"
+        SecurityGroupIngress:
+        -   IpProtocol: tcp
+            FromPort: 80
+            ToPort: 80
+            CidrIp: 0.0.0.0/0
+        SecurityGroupEgress:
+        -   IpProtocol: tcp
+            FromPort: 80
+            ToPort: 80
+            CidrIp: 0.0.0.0/0
 
 
   LAUNCHCONFIGURATION_WebApp: 
@@ -66,9 +83,8 @@ Resources:
           apt-get install apache2 -y
           systemctl start apache2.service
           cd /var/www/html
-          aws s3 cp s3://udacity-demo-1/udacity.zip .
+          aws s3 cp s3://${P_S3_Bucket_Name}/${P_S3_Bucket_Subdir} .
           unzip -o udacity.zip
-
       # Amazon Linux 2 AMI (HVM), SSD Volume Type (64-bit x86)
       ImageId: ami-0bd39c806c2335b95
       # t2.medium
@@ -82,7 +98,40 @@ Resources:
         Ebs:
           VolumeSize: '10'
 
+
+  WebAppTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 8
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref VPC
+
+
+    WebAppGroup:
+        Type: AWS::AutoScaling::AutoScalingGroup
+        Properties:
+            VPCZoneIdentifier:  
+            - !Ref PrivateSubnet1
+            - !Ref PrivateSubnet2 
+            LaunchConfigurationName:
+                Ref: WebAppLaunchConfig
+            MinSize: '2'
+            MaxSize: '5'
+            TargetGroupARNs:
+            -   Ref: WebAppTargetGroup
   
-  Outputs: 
+  
+
+
+Outputs: 
     
-    
+
+SUBNET_private_01
+SUBNET_private_02
+VPC_HA_WebApp    
