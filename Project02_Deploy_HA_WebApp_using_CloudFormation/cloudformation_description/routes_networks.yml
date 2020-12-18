@@ -1,24 +1,28 @@
 Parameters:
   EnvironmentName:
-         Description: An environment name that will be prefixed to resource names
+        Description: An environment name that will be prefixed to resource names
         Type: String
-        Default: iac_udacity
-  VpcCIDR: 
-        Description: Please enter the IP range (CIDR notation) for this VPC
+        Default: project_iac_udacity
+  P_CIDR_vpc: 
+        Description: VPC IP Address Range
         Type: String
         Default: 10.0.0.0/16
-  PrivateSubnet1CIDR:
-        Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+  P_CIDR_private_subnet_01:
+        Description: Availability Zone 1 Private Subnet IP Address Range
+        Type: String
+        Default: 10.0.1.0/24
+  P_CIDR_private_subnet_02:
+        Description: Availability Zone 2 Private Subnet IP Address Range
         Type: String
         Default: 10.0.2.0/24
-  PrivateSubnet2CIDR:
-        Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+  P_CIDR_public_subnet_01:
+        Description: Availability Zone 1 Public Subnet IP Address Range
         Type: String
         Default: 10.0.3.0/24
-  OnPremGateway:
-        Description: Please enter the IP address of the on-prem VPN Appliance
+  P_CIDR_public_subnet_02:
+        Description: Availability Zone 2 Public Subnet IP Address Range
         Type: String
-        Default: 1.2.3.4
+        Default: 10.0.4.0/24
 
 Resources:
 
@@ -27,9 +31,9 @@ Resources:
   #########################
   
   VPC_HA_WebApp: 
-    Type: AWS::EC2::VPC
+    Type : AWS::EC2::VPC
     Properties:
-      CidrBlock: !Ref P_CIDR_vpc
+      Cid rBlock: !Ref P_CIDR_vpc
       EnableDnsHostnames: true
 
 
@@ -42,7 +46,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC_HA_WebApp 
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
-      CidrBlock: !Ref P_CIDR_priv_subnet_01
+      CidrBlock: !Ref P_CIDR_private_subnet_01
       MapPublicIpOnLaunch: false
 
 
@@ -51,7 +55,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC_HA_WebApp
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
-      CidrBlock: !Ref P_CIDR_priv_subnet_02
+      CidrBlock: !Ref P_CIDR_private_subnet_02
       MapPublicIpOnLaunch: false
       
     
@@ -60,7 +64,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC_HA_WebApp 
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
-      CidrBlock: !Ref P_CIDR_pub_subnet_01
+      CidrBlock: !Ref P_CIDR_public_subnet_01
       MapPublicIpOnLaunch: false
 
 
@@ -69,7 +73,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC_HA_WebApp
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
-      CidrBlock: !Ref P_CIDR_pub_subnet_02
+      CidrBlock: !Ref P_CIDR_public_subnet_02
       MapPublicIpOnLaunch: false
 
 
@@ -172,35 +176,93 @@ Resources:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref ROUTETABLE_public_01 
-      SubnetId: !Ref SUBNET_public_01
+       SubnetId: !Ref SUBNET_public_01
 
 
   SUBNROUTEASSOC_public_02:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref ROUTETABLE_public_02
-      SubnetId: !Ref SUBNET_public_02
+       SubnetId: !Ref SUBNET_public_02
 
  
   SUBNROUTEASSOC_private_01:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref ROUTETABLE_private_01
-      SubnetId: !Ref SUBNET_private_01
+       SubnetId: !Ref SUBNET_private_01
 
     
   SUBNROUTEASSOC_private_02:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref ROUTETABLE_private_02
-      SubnetId: !Ref SUBNET_private_02
+       SubnetId: !Ref SUBNET_private_02
+
+
+
 
 
 Outputs:
-  OUT_VPC:
-    Description: Reference Output for VPC
+  VPC:
+    Description: A reference to the created VPC
     Value: !Ref VPC
     Export:
       Name: !Sub ${EnvironmentName}-VPC-ID
 
-  
+  VPCPublicRouteTable:
+    Description: Public Routing
+    Value: !Ref PublicRouteTable
+    Export:
+      Name: !Sub ${EnvironmentName}-PUB-RT
+
+  VPCPrivateRouteTable1:
+    Description: Private Routing AZ1
+    Value: !Ref PrivateRouteTable1
+    Export:
+      Name: !Sub ${EnvironmentName}-PRIV1-RT
+
+  VPCPrivateRouteTable2:
+    Description: Private Routing AZ2
+    Value: !Ref PrivateRouteTable2
+    Export:
+      Name: !Sub ${EnvironmentName}-PRIV2-RT
+
+  PublicSubnets:
+    Description: A list of public subnets
+    Value: !Join [",", [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]]
+    Export:
+      Name: !Sub ${EnvironmentName}-PUB-NETS
+
+  PrivateSubnets:
+    Description: A list of private subnets
+    Value: !Join [",", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]]
+    Export:
+      Name: !Sub ${EnvironmentName}-PRIV-NETS
+
+  PublicSubnet1:
+    Description: A reference to the public subnet in the 1st Availability Zone
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: !Sub ${EnvironmentName}-PUB1-SN
+
+  PublicSubnet2:
+    Description: A reference to the public subnet in the 2nd Availability Zone
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: !Sub ${EnvironmentName}-PUB2-SN
+
+  PrivateSubnet1:
+    Description: A reference to the private subnet in the 1st Availability Zone
+    Value: !Ref PrivateSubnet1
+    Export:
+      Name: !Sub ${EnvironmentName}-PRIV1-SN
+
+  PrivateSubnet2:
+    Description: A reference to the private subnet in the 2nd Availability Zone
+    Value: !Ref PrivateSubnet2
+    Export:
+      Name: !Sub ${EnvironmentName}-PRIV2-SN
+      
+      
+ 
