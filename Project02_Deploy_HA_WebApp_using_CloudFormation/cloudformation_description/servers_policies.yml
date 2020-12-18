@@ -41,12 +41,16 @@ Resources:
   SECGROUP_WebServer:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow http and ssh to our load balancer
+      GroupDescription: Allow Ingress http and ssh and Egress all Ports
         VpcId: Fn::ImportValue: !Sub "${EnvironmentName}_VPC_HA_WebApp"
           SecurityGroupIngress:
             - IpProtocol: tcp
               FromPort: 80
               ToPort: 80
+              CidrIp: 0.0.0.0/0            
+            - IpProtocol: tcp
+              FromPort: 22
+              ToPort: 22
               CidrIp: 0.0.0.0/0
           SecurityGroupEgress:
             - IpProtocol: tcp
@@ -55,24 +59,24 @@ Resources:
               CidrIp: 0.0.0.0/0
 
   
-   SECGROUP_LoadBalancer:
-      Type: AWS::EC2::SecurityGroup
-      Properties:
-        GroupDescription: Allow http traffic to and from load balancer
-        VpcId: Fn::ImportValue: !Sub "${EnvironmentName}_VPC_HA_WebApp"
-        SecurityGroupIngress:
-        -   IpProtocol: tcp
-            FromPort: 80
-            ToPort: 80
-            CidrIp: 0.0.0.0/0
-        SecurityGroupEgress:
-        -   IpProtocol: tcp
-            FromPort: 80
-            ToPort: 80
-            CidrIp: 0.0.0.0/0
+  SECGROUP_LoadBalancer:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow Ingress http and Egress http
+      VpcId: Fn::ImportValue: !Sub "${EnvironmentName}_VPC_HA_WebApp"
+      SecurityGroupIngress:
+      -   IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      -   IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
 
 
-  LAUNCHCONFIGURATION_WebApp: 
+  LAUNCHCONFIG_WebApp: 
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
       UserData:
@@ -92,14 +96,14 @@ Resources:
       #KeyName: platforms-key
       IamInstanceProfile: !Ref PROFILE_S3Instance
       SecurityGroups:
-      - Ref: SECGROUP_WebServer
+        - Ref: SECGROUP_WebServer
       BlockDeviceMappings:
-      - DeviceName: "/dev/sda"
-        Ebs:
-          VolumeSize: '10'
+        - DeviceName: "/dev/sda"
+          Ebs:
+            VolumeSize: '10'
 
 
-  WebAppTargetGroup:
+  TARGETGROUP_WebApp:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       HealthCheckIntervalSeconds: 10
@@ -110,23 +114,64 @@ Resources:
       UnhealthyThresholdCount: 5
       Port: 80
       Protocol: HTTP
-      VpcId: !Ref VPC
+      VpcId: Fn::ImportValue: !Sub "${EnvironmentName}_VPC_HA_WebApp"
 
 
-    WebAppGroup:
-        Type: AWS::AutoScaling::AutoScalingGroup
-        Properties:
-            VPCZoneIdentifier:  
-            - !Ref PrivateSubnet1
-            - !Ref PrivateSubnet2 
-            LaunchConfigurationName:
-                Ref: WebAppLaunchConfig
-            MinSize: '2'
-            MaxSize: '5'
-            TargetGroupARNs:
-            -   Ref: WebAppTargetGroup
+  SNSTOPIC_autoscaling:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: "Autoscaling_Events"
+
+
+  AUTOSCALINGGROUP_WebApp:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier: 
+      - Fn::ImportValue: !Sub "${EnvironmentName}_SUBNETS_private"
+      LaunchConfigurationName:
+        Ref: LAUNCHCONFIG_WebApp
+      MinSize: '2'
+      MaxSize: '5'
+      NotificationConfigurations:
+      - TopicARN: !Ref SNSTOPIC_autoscaling
+        NotificationTypes:
+        - autoscaling:EC2_INSTANCE_LAUNCH
+        - autoscaling:EC2_INSTANCE_LAUNCH_ERROR
+        - autoscaling:EC2_INSTANCE_TERMINATE
+        - autoscaling:EC2_INSTANCE_TERMINATE_ERROR
+        - autoscaling:TEST_NOTIFICATION
+      TargetGroupARNs:
+        - Ref: WebAppTargetGroup
   
+
+  WebAppLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Subnets:
+      - Fn::ImportValue: !Sub "${EnvironmentName}_SUBNETS_private"
+      SecurityGroups: [ !Ref SECGROUP_LoadBalancer ]
   
+  LBListener: 
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TARGETGROUP_WebApp
+      LoadBalancerArn: !Ref WebAppLB
+      Port: 80
+      Protocol: HTTP
+  
+  ALBListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions: 
+        - Type: forward
+          TargetGroupArn: !Ref WebAppTargetGroup
+      Conditions:
+        - Field: path-pattern
+          Values: [/]
+      ListenerArn: !Ref LBListener
+      Priority: 1
 
 
 Outputs: 
