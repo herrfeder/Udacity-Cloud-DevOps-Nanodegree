@@ -1,0 +1,206 @@
+Parameters:
+  EnvironmentName:
+         Description: An environment name that will be prefixed to resource names
+        Type: String
+        Default: iac_udacity
+  VpcCIDR: 
+        Description: Please enter the IP range (CIDR notation) for this VPC
+        Type: String
+        Default: 10.0.0.0/16
+  PrivateSubnet1CIDR:
+        Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+        Type: String
+        Default: 10.0.2.0/24
+  PrivateSubnet2CIDR:
+        Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+        Type: String
+        Default: 10.0.3.0/24
+  OnPremGateway:
+        Description: Please enter the IP address of the on-prem VPN Appliance
+        Type: String
+        Default: 1.2.3.4
+
+Resources:
+
+  #########################
+  ######### VPC ###########
+  #########################
+  
+  VPC_HA_WebApp: 
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref P_CIDR_vpc
+      EnableDnsHostnames: true
+
+
+  #########################
+  ######## SUBNETS ########
+  #########################
+
+  SUBNET_private_01:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC_HA_WebApp 
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref P_CIDR_priv_subnet_01
+      MapPublicIpOnLaunch: false
+
+
+  SUBNET_private_02:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC_HA_WebApp
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref P_CIDR_priv_subnet_02
+      MapPublicIpOnLaunch: false
+      
+    
+  SUBNET_public_01:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC_HA_WebApp 
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref P_CIDR_pub_subnet_01
+      MapPublicIpOnLaunch: false
+
+
+  SUBNET_public_02:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC_HA_WebApp
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref P_CIDR_pub_subnet_02
+      MapPublicIpOnLaunch: false
+
+
+  #########################
+  #### INTERNETGATEWAY ####
+  #########################
+
+  INTERNETGW_01: 
+    Type: AWS::EC2::InternetGateway
+
+
+  VPCGWATTA_01:
+    Type:  AWS::EC2::VPCGatewayAttachment 
+    Properties: 
+      VpcId: !Ref VPC_HA_WebApp 
+      InternetGatewayId: !Ref INTERNETGW_01
+
+
+  #########################
+  ########## NAT ##########
+  #########################
+
+  EIP_NATGateway_01:
+    Type: AWS::EC2::EIP
+    DependsOn: INTERNETGW_01
+    Properties: 
+      Domain: vpc
+
+
+  EIP_NATGateway_02:
+    Type: AWS::EC2::EIP
+    DependsOn: INTERNETGW_01
+    Properties:
+      Domain: vpc
+
+
+  NATGW_01: 
+    Type: AWS::EC2::NatGateway
+    Properties: 
+      AllocationId: !GetAtt EIP_NATGateway_01.AllocationId
+      SubnetId: !Ref SUBNET_public_01
+
+
+  NATGW_02: 
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt EIP_NATGateway_02.AllocationId
+      SubnetId: !Ref SUBNET_public_02
+   
+   
+  #########################
+  ######## ROUTES #########
+  #########################
+    
+  ROUTETABLE_public_01:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPC_HA_WebApp
+
+  ROUTE_public_01: 
+    Type: AWS::EC2::Route
+    DependsOn: VPCGWATTA_01
+    Properties: 
+      RouteTableId: !Ref ROUTERTABLE_public_01
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref INTERNETGW_01
+
+
+  ROUTETABLE_private_01:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPC_HA_WebApp
+
+  ROUTE_private_01:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref ROUTETABLE_private_01
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGW_01
+
+
+  ROUTETABLE_private_02:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPC_HA_WebApp
+
+  ROUTE_private_02:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref ROUTETABLE_private_02
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGW_02
+
+
+  #########################
+  ###### ROUTE ASSOC ######
+  #########################
+
+  SUBNROUTEASSOC_public_01:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref ROUTETABLE_public_01 
+      SubnetId: !Ref SUBNET_public_01
+
+
+  SUBNROUTEASSOC_public_02:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref ROUTETABLE_public_02
+      SubnetId: !Ref SUBNET_public_02
+
+ 
+  SUBNROUTEASSOC_private_01:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref ROUTETABLE_private_01
+      SubnetId: !Ref SUBNET_private_01
+
+    
+  SUBNROUTEASSOC_private_02:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref ROUTETABLE_private_02
+      SubnetId: !Ref SUBNET_private_02
+
+
+Outputs:
+  OUT_VPC:
+    Description: Reference Output for VPC
+    Value: !Ref VPC
+    Export:
+      Name: !Sub ${EnvironmentName}-VPC-ID
+
+  
