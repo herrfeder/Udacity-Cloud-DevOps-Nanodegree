@@ -1,0 +1,88 @@
+Parameters:
+# whatever you consider a changing value, put it as a parameter instead of hard-coding it into your script
+Resources:
+  #instace profile contains the IAM Role name(s) that we want to associate to our auto scaling EC2 Servers
+  PROFILE_S3Instance:
+    Type: AWS::IAM::InstanceProfile
+    Properties: 
+      Roles:
+      - Ref: ROLE_S3ReadOnlyEC2
+
+
+  ROLE_S3ReadOnlyEC2:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: 
+        !Sub ${EnvironmentName}-Role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+        Path: "/"
+        Policies:
+          - PolicyName: POLICY_S3ReadOnly
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action: 
+                    - s3:Get*
+                    - s3:List*
+                  Resource: 
+                    - arn:aws:s3:::c3pipelines-devops
+                    - arn:aws:s3:::c3pipelines-devops/*
+
+
+  SECGROUP_WebServer:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http and ssh to our load balancer
+        VpcId: !Ref VPC_HA_WebApp
+          SecurityGroupIngress:
+            - IpProtocol: tcp
+              FromPort: 80
+              ToPort: 80
+              CidrIp: 0.0.0.0/0
+          SecurityGroupEgress:
+            - IpProtocol: tcp
+              FromPort: 0
+              ToPort: 65535
+              CidrIp: 0.0.0.0/0
+
+
+  LAUNCHCONFIGURATION_WebApp: 
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          apt-get update -y
+          apt-get install unzip awscli -y
+          apt-get install apache2 -y
+          systemctl start apache2.service
+          cd /var/www/html
+          aws s3 cp s3://udacity-demo-1/udacity.zip .
+          unzip -o udacity.zip
+
+      # Amazon Linux 2 AMI (HVM), SSD Volume Type (64-bit x86)
+      ImageId: ami-0bd39c806c2335b95
+      # t2.medium
+      InstanceType: t2.medium
+      #KeyName: platforms-key
+      IamInstanceProfile: !Ref PROFILE_S3Instance
+      SecurityGroups:
+      - Ref: SECGROUP_WebServer
+      BlockDeviceMappings:
+      - DeviceName: "/dev/sda"
+        Ebs:
+          VolumeSize: '10'
+
+  
+  Outputs: 
+    
+    
