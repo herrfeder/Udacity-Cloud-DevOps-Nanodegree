@@ -1,19 +1,37 @@
-Parameters:
-# whatever you consider a changing value, put it as a parameter instead of hard-coding it into your script
+Parameters: 
+  EnvironmentName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+    Default: udacityIACproject
+  PS3BucketName:
+    Description: The name of the S3 bucket with desired files to be deployed
+    Type: String
+    AllowedPattern: ^[0-9a-zA-Z][0-9a-zA-Z-]*$
+    Default: udacity-demo-1 
+  PS3Filepath:
+    Description: Filepath with zip extension
+    Type: String
+    AllowedPattern: ^.*\.zip$
+    Default: udacity.zip
+
 Resources:
-  #instace profile contains the IAM Role name(s) that we want to associate to our auto scaling EC2 Servers
-  PROFILE_S3Instance:
+
+  #########################
+  ##### POLICY/PROFILE ####
+  #########################
+
+  PROFILES3Instance:
     Type: AWS::IAM::InstanceProfile
     Properties: 
-      Roles:
-      - Ref: ROLE_S3ReadOnlyEC2
+       Roles:
+         - Ref: ROLES3ReadOnlyEC2
 
 
-  ROLE_S3ReadOnlyEC2:
+  ROLES3ReadOnlyEC2:
     Type: AWS::IAM::Role
     Properties:
       RoleName: 
-        !Sub ${EnvironmentName}-Role
+        !Sub ${EnvironmentName}S3role
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -25,7 +43,7 @@ Resources:
           - sts:AssumeRole
         Path: "/"
         Policies:
-          - PolicyName: POLICY_S3ReadOnly
+          - PolicyName: POLICYS3ReadOnly
             PolicyDocument:
               Version: 2012-10-17
               Statement:
@@ -34,49 +52,119 @@ Resources:
                     - s3:Get*
                     - s3:List*
                   Resource: 
-                    - arn:aws:s3:::${P_S3_Bucket_Name}
-                    - arn:aws:s3:::${P_S3_Bucket_Name}/*
+                    - arn:aws:s3:::${PS3BucketName}
+                    - arn:aws:s3:::${PS3BucketName}/*
 
 
-  SECGROUP_WebServer:
+  #########################
+  ####### SECGROUPS #######
+  #########################
+
+  SECGROUPWebServer:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow Ingress http and ssh and Egress all Ports
-        VpcId: Fn::ImportValue: !Sub "${EnvironmentName}_VPC_HA_WebApp"
-          SecurityGroupIngress:
-            - IpProtocol: tcp
-              FromPort: 80
-              ToPort: 80
-              CidrIp: 0.0.0.0/0            
-            - IpProtocol: tcp
-              FromPort: 22
-              ToPort: 22
-              CidrIp: 0.0.0.0/0
-          SecurityGroupEgress:
-            - IpProtocol: tcp
-              FromPort: 0
-              ToPort: 65535
-              CidrIp: 0.0.0.0/0
+      VpcId: 
+        Fn::ImportValue: 
+          !Sub "${EnvironmentName}-VPCHAWebApp"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0            
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
 
   
-  SECGROUP_LoadBalancer:
+  SECGROUPLoadBalancer:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow Ingress http and Egress http
-      VpcId: Fn::ImportValue: !Sub "${EnvironmentName}_VPC_HA_WebApp"
+      VpcId: 
+        Fn::ImportValue: 
+          !Sub "${EnvironmentName}-VPCHAWebApp"
       SecurityGroupIngress:
-      -   IpProtocol: tcp
+        - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
       SecurityGroupEgress:
-      -   IpProtocol: tcp
+        - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
 
 
-  LAUNCHCONFIG_WebApp: 
+  #########################
+  ##### LOADBALANCER ######
+  #########################
+
+  TARGETGROUPWebApp:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 20
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+      Port: 80
+      Protocol: HTTP
+      VpcId: 
+        Fn::ImportValue: 
+          !Sub "${EnvironmentName}-VPCHAWebApp"
+
+
+  LOADBALANCERWebApp:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Subnets: 
+        Fn::ImportValue: 
+          !Sub "${EnvironmentName}-SUBNETSprivate"
+      SecurityGroups:
+        - Ref: SECGROUPLoadBalancer
+ 
+ 
+  LISTENERWebApp: 
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: 
+            - Ref: TARGETGROUPWebApp
+      LoadBalancerArn: 
+        - Ref: LOADBALANCERWebApp
+      Port: 80
+      Protocol: HTTP
+  
+
+  LISTENERRULEWebApp:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions: 
+        - Type: forward
+          TargetGroupArn:
+            - Ref: TARGETGROUPWebApp
+      Conditions:
+        - Field: path-pattern
+          Values: [/]
+      ListenerArn:
+        - Ref: LISTENERWebApp
+      Priority: 1
+
+
+  #########################
+  # INSTANCE/AUTOSCALING ##
+  #########################
+
+  LAUNCHCONFIGWebApp: 
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
       UserData:
@@ -87,96 +175,56 @@ Resources:
           apt-get install apache2 -y
           systemctl start apache2.service
           cd /var/www/html
-          aws s3 cp s3://${P_S3_Bucket_Name}/${P_S3_Bucket_Subdir} .
-          unzip -o udacity.zip
+          aws s3 cp s3://${PS3BucketName}/${PS3Filepath} .
+          unzip -o ${PS3Filepath}
       # Amazon Linux 2 AMI (HVM), SSD Volume Type (64-bit x86)
       ImageId: ami-0bd39c806c2335b95
       # t2.medium
       InstanceType: t2.medium
       #KeyName: platforms-key
-      IamInstanceProfile: !Ref PROFILE_S3Instance
+      IamInstanceProfile:
+        - Ref: PROFILES3Instance
       SecurityGroups:
-        - Ref: SECGROUP_WebServer
+        - Ref: SECGROUPWebServer
       BlockDeviceMappings:
         - DeviceName: "/dev/sda"
           Ebs:
-            VolumeSize: '10'
+             VolumeSize: '10'
 
 
-  TARGETGROUP_WebApp:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      HealthCheckIntervalSeconds: 10
-      HealthCheckPath: /
-      HealthCheckProtocol: HTTP
-      HealthCheckTimeoutSeconds: 8
-      HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 5
-      Port: 80
-      Protocol: HTTP
-      VpcId: Fn::ImportValue: !Sub "${EnvironmentName}_VPC_HA_WebApp"
-
-
-  SNSTOPIC_autoscaling:
+  SNSTOPICautoscaling:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: "Autoscaling_Events"
+      TopicName: "AutoscalingEvents"
 
 
-  AUTOSCALINGGROUP_WebApp:
+  AUTOSCALINGGROUPWebApp:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       VPCZoneIdentifier: 
-      - Fn::ImportValue: !Sub "${EnvironmentName}_SUBNETS_private"
+        Fn::ImportValue: 
+          !Sub "${EnvironmentName}SUBNETSprivate"
       LaunchConfigurationName:
-        Ref: LAUNCHCONFIG_WebApp
+        Ref: LAUNCHCONFIGWebApp
       MinSize: '2'
       MaxSize: '5'
       NotificationConfigurations:
-      - TopicARN: !Ref SNSTOPIC_autoscaling
-        NotificationTypes:
-        - autoscaling:EC2_INSTANCE_LAUNCH
-        - autoscaling:EC2_INSTANCE_LAUNCH_ERROR
-        - autoscaling:EC2_INSTANCE_TERMINATE
-        - autoscaling:EC2_INSTANCE_TERMINATE_ERROR
-        - autoscaling:TEST_NOTIFICATION
+        TopicARN:
+          - Ref: SNSTOPICautoscaling
+      NotificationTypes:
+        - autoscaling:EC2INSTANCELAUNCH
+        - autoscaling:EC2INSTANCELAUNCHERROR
+        - autoscaling:EC2INSTANCETERMINATE
+        - autoscaling:EC2INSTANCETERMINATEERROR
+        - autoscaling:TESTNOTIFICATION
       TargetGroupARNs:
-        - Ref: WebAppTargetGroup
-  
-
-  WebAppLB:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-    Properties:
-      Subnets:
-      - Fn::ImportValue: !Sub "${EnvironmentName}_SUBNETS_private"
-      SecurityGroups: [ !Ref SECGROUP_LoadBalancer ]
-  
-  LBListener: 
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref TARGETGROUP_WebApp
-      LoadBalancerArn: !Ref WebAppLB
-      Port: 80
-      Protocol: HTTP
-  
-  ALBListenerRule:
-    Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    Properties:
-      Actions: 
-        - Type: forward
-          TargetGroupArn: !Ref WebAppTargetGroup
-      Conditions:
-        - Field: path-pattern
-          Values: [/]
-      ListenerArn: !Ref LBListener
-      Priority: 1
+        - Ref: TARGETGROUPWebApp
 
 
 Outputs: 
-    
+  
+  OLOADBALANCERWebAppDNS:
+    Description: URL of public LoadBalancer DNS Address
+    Value: !Join [ "", [ "http://", !GetAtt LOADBALANCERWebApp.DNSName ] ]
 
-SUBNET_private_01
-SUBNET_private_02
-VPC_HA_WebApp    
+

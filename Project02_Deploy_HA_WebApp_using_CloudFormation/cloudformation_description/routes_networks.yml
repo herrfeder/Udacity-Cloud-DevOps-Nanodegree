@@ -1,28 +1,30 @@
 Parameters:
+  
   EnvironmentName:
-        Description: An environment name that will be prefixed to resource names
-        Type: String
-        Default: project_iac_udacity
-  P_CIDR_vpc: 
-        Description: VPC IP Address Range
-        Type: String
-        Default: 10.0.0.0/16
-  P_CIDR_private_subnet_01:
-        Description: Availability Zone 1 Private Subnet IP Address Range
-        Type: String
-        Default: 10.0.1.0/24
-  P_CIDR_private_subnet_02:
-        Description: Availability Zone 2 Private Subnet IP Address Range
-        Type: String
-        Default: 10.0.2.0/24
-  P_CIDR_public_subnet_01:
-        Description: Availability Zone 1 Public Subnet IP Address Range
-        Type: String
-        Default: 10.0.3.0/24
-  P_CIDR_public_subnet_02:
-        Description: Availability Zone 2 Public Subnet IP Address Range
-        Type: String
-        Default: 10.0.4.0/24
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+    Default: udacityUACproject
+  PCIDRvpc: 
+    Description: VPC IP Address Range
+    Type: String
+    Default: 10.0.0.0/16
+  PCIDRprivatesubnet01:
+    Description: Availability Zone 1 Private Subnet IP Address Range
+    Type: String
+    Default: 10.0.1.0/24
+  PCIDRprivatesubnet02:
+    Description: Availability Zone 2 Private Subnet IP Address Range
+    Type: String
+    Default: 10.0.2.0/24
+  PCIDRpublicsubnet01:
+    Description: Availability Zone 1 Public Subnet IP Address Range
+    Type: String
+    Default: 10.0.3.0/24
+  PCIDRpublicsubnet02:
+    Description: Availability Zone 2 Public Subnet IP Address Range
+    Type: String
+    Default: 10.0.4.0/24
+
 
 Resources:
 
@@ -30,10 +32,11 @@ Resources:
   ######### VPC ###########
   #########################
   
-  VPC_HA_WebApp: 
+  VPCHAWebApp: 
     Type : AWS::EC2::VPC
     Properties:
-      Cid rBlock: !Ref P_CIDR_vpc
+      CidrBlock:
+        Ref: PCIDRvpc
       EnableDnsHostnames: true
 
 
@@ -41,39 +44,47 @@ Resources:
   ######## SUBNETS ########
   #########################
 
-  SUBNET_private_01:
+  SUBNETprivate01:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref VPC_HA_WebApp 
+      VpcId:
+        Ref: VPCHAWebApp 
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
-      CidrBlock: !Ref P_CIDR_private_subnet_01
+      CidrBlock:
+        Ref: PCIDRprivatesubnet01
       MapPublicIpOnLaunch: false
 
 
-  SUBNET_private_02:
+  SUBNETprivate02:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref VPC_HA_WebApp
+      VpcId:
+        Ref: VPCHAWebApp
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
-      CidrBlock: !Ref P_CIDR_private_subnet_02
+      CidrBlock:
+        Ref: PCIDRprivatesubnet02
       MapPublicIpOnLaunch: false
       
     
-  SUBNET_public_01:
+  SUBNETpublic01:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref VPC_HA_WebApp 
+      VpcId:
+        Ref: VPCHAWebApp 
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
-      CidrBlock: !Ref P_CIDR_public_subnet_01
+      CidrBlock:
+        Ref: PCIDRpublicsubnet01
       MapPublicIpOnLaunch: false
 
 
-  SUBNET_public_02:
+  SUBNETpublic02:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref VPC_HA_WebApp
+      VpcId:
+        Ref: VPCHAWebApp
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
-      CidrBlock: !Ref P_CIDR_public_subnet_02
+      CidrBlock:
+        Ref: PCIDRpublicsubnet02
       MapPublicIpOnLaunch: false
 
 
@@ -81,188 +92,175 @@ Resources:
   #### INTERNETGATEWAY ####
   #########################
 
-  INTERNETGW_01: 
+  INTERNETGW01: 
     Type: AWS::EC2::InternetGateway
 
 
-  VPCGWATTA_01:
+  VPCGWATTA01:
     Type:  AWS::EC2::VPCGatewayAttachment 
     Properties: 
-      VpcId: !Ref VPC_HA_WebApp 
-      InternetGatewayId: !Ref INTERNETGW_01
+      VpcId:
+        Ref: VPCHAWebApp 
+      InternetGatewayId:
+        Ref: INTERNETGW01
 
 
   #########################
   ########## NAT ##########
   #########################
 
-  EIP_NATGateway_01:
+  EIPNATGateway01:
     Type: AWS::EC2::EIP
-    DependsOn: INTERNETGW_01
+    DependsOn: INTERNETGW01
     Properties: 
       Domain: vpc
 
 
-  EIP_NATGateway_02:
+  EIPNATGateway02:
     Type: AWS::EC2::EIP
-    DependsOn: INTERNETGW_01
+    DependsOn: INTERNETGW01
     Properties:
       Domain: vpc
 
 
-  NATGW_01: 
-    Type: AWS::EC2::NatGateway
+  NATGW01: 
+    Type : AWS::EC2::NatGateway
     Properties: 
-      AllocationId: !GetAtt EIP_NATGateway_01.AllocationId
-      SubnetId: !Ref SUBNET_public_01
+      All ocationId: !GetAtt EIPNATGateway01.AllocationId
+      SubnetId:
+        Ref: SUBNETpublic01
 
 
-  NATGW_02: 
+  NATGW02: 
     Type: AWS::EC2::NatGateway
     Properties:
-      AllocationId: !GetAtt EIP_NATGateway_02.AllocationId
-      SubnetId: !Ref SUBNET_public_02
+      AllocationId: !GetAtt EIPNATGateway02.AllocationId
+      SubnetId:
+        Ref: SUBNETpublic02
    
    
   #########################
   ######## ROUTES #########
   #########################
     
-  ROUTETABLE_public_01:
+  ROUTETABLEpublic01:
     Type: AWS::EC2::RouteTable
     Properties: 
-      VpcId: !Ref VPC_HA_WebApp
+      VpcId:
+        Ref: VPCHAWebApp
 
-  ROUTE_public_01: 
-    Type: AWS::EC2::Route
-    DependsOn: VPCGWATTA_01
+  ROUTEpublic01: 
+    Type : AWS::EC2::Route
+    DependsOn: VPCGWATTA01
     Properties: 
-      RouteTableId: !Ref ROUTERTABLE_public_01
+      Rou teTableId:
+        Ref: ROUTETABLEpublic01
       DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref INTERNETGW_01
+      GatewayId:
+        Ref: INTERNETGW01
 
 
-  ROUTETABLE_private_01:
+  ROUTETABLEprivate01:
     Type: AWS::EC2::RouteTable
     Properties: 
-      VpcId: !Ref VPC_HA_WebApp
+      VpcId:
+        Ref: VPCHAWebApp
 
-  ROUTE_private_01:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref ROUTETABLE_private_01
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NATGW_01
-
-
-  ROUTETABLE_private_02:
-    Type: AWS::EC2::RouteTable
-    Properties: 
-      VpcId: !Ref VPC_HA_WebApp
-
-  ROUTE_private_02:
+  ROUTEprivate01:
     Type: AWS::EC2::Route
     Properties:
-      RouteTableId: !Ref ROUTETABLE_private_02
+      RouteTableId:
+        Ref: ROUTETABLEprivate01
       DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NATGW_02
+      NatGatewayId:
+        Ref: NATGW01
+
+
+  ROUTETABLEprivate02:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId:
+        Ref: VPCHAWebApp
+
+  ROUTEprivate02:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: ROUTETABLEprivate02
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: NATGW02
 
 
   #########################
   ###### ROUTE ASSOC ######
   #########################
 
-  SUBNROUTEASSOC_public_01:
+  SUBNROUTEASSOCpublic01:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref ROUTETABLE_public_01 
-       SubnetId: !Ref SUBNET_public_01
+      RouteTableId:
+        Ref: ROUTETABLEpublic01 
+      SubnetId:
+        Ref: SUBNETpublic01
 
 
-  SUBNROUTEASSOC_public_02:
+  SUBNROUTEASSOCpublic02:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref ROUTETABLE_public_02
-       SubnetId: !Ref SUBNET_public_02
+      RouteTableId:
+        Ref: ROUTETABLEpublic01
+      SubnetId:
+        Ref: SUBNETpublic02
 
  
-  SUBNROUTEASSOC_private_01:
+  SUBNROUTEASSOCprivate01:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref ROUTETABLE_private_01
-       SubnetId: !Ref SUBNET_private_01
+      RouteTableId:
+        Ref: ROUTETABLEprivate01
+      SubnetId:
+        Ref: SUBNETprivate01
 
     
-  SUBNROUTEASSOC_private_02:
+  SUBNROUTEASSOCprivate02:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref ROUTETABLE_private_02
-       SubnetId: !Ref SUBNET_private_02
-
+      RouteTableId:
+        Ref: ROUTETABLEprivate02
+      SubnetId:
+        Ref: SUBNETprivate02
 
 
 
 
 Outputs:
-  VPC:
-    Description: A reference to the created VPC
-    Value: !Ref VPC
+  OVPCHAWebApp:
+    Description: Output for created VPC
+    Value: 
+      Ref: VPCHAWebApp
     Export:
-      Name: !Sub ${EnvironmentName}-VPC-ID
+      Name: !Sub ${EnvironmentName}-VPCHAWebApp
 
-  VPCPublicRouteTable:
-    Description: Public Routing
-    Value: !Ref PublicRouteTable
+  OSUBNETSprivate:
+    Description: Output for List of  private subnets
+    Value: !Join [",", [ !Ref SUBNETprivate01, !Ref SUBNETprivate02 ]]
     Export:
-      Name: !Sub ${EnvironmentName}-PUB-RT
+      Name: !Sub ${EnvironmentName}-SUBNETSprivate
 
-  VPCPrivateRouteTable1:
-    Description: Private Routing AZ1
-    Value: !Ref PrivateRouteTable1
+  OSUBNETprivate01:
+    Description: Output for private subnet in 1st availability zone
+    Value: 
+      Ref: SUBNETprivate01
     Export:
-      Name: !Sub ${EnvironmentName}-PRIV1-RT
+      Name: !Sub ${EnvironmentName}-SUBNETprivate01
 
-  VPCPrivateRouteTable2:
-    Description: Private Routing AZ2
-    Value: !Ref PrivateRouteTable2
+  OSUBNETprivate02:
+    Description: Output for private subnet in 2nd availability zone
+    Value: 
+      Ref: SUBNETprivate02
     Export:
-      Name: !Sub ${EnvironmentName}-PRIV2-RT
-
-  PublicSubnets:
-    Description: A list of public subnets
-    Value: !Join [",", [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]]
-    Export:
-      Name: !Sub ${EnvironmentName}-PUB-NETS
-
-  PrivateSubnets:
-    Description: A list of private subnets
-    Value: !Join [",", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]]
-    Export:
-      Name: !Sub ${EnvironmentName}-PRIV-NETS
-
-  PublicSubnet1:
-    Description: A reference to the public subnet in the 1st Availability Zone
-    Value: !Ref PublicSubnet1
-    Export:
-      Name: !Sub ${EnvironmentName}-PUB1-SN
-
-  PublicSubnet2:
-    Description: A reference to the public subnet in the 2nd Availability Zone
-    Value: !Ref PublicSubnet2
-    Export:
-      Name: !Sub ${EnvironmentName}-PUB2-SN
-
-  PrivateSubnet1:
-    Description: A reference to the private subnet in the 1st Availability Zone
-    Value: !Ref PrivateSubnet1
-    Export:
-      Name: !Sub ${EnvironmentName}-PRIV1-SN
-
-  PrivateSubnet2:
-    Description: A reference to the private subnet in the 2nd Availability Zone
-    Value: !Ref PrivateSubnet2
-    Export:
-      Name: !Sub ${EnvironmentName}-PRIV2-SN
+      Name: !Sub ${EnvironmentName}-SUBNETprivate02
       
       
  

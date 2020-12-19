@@ -1,0 +1,26 @@
+[
+    {
+        "ParameterKey": "EnvironmentName",
+        "ParameterValue": "udacityIACproject"
+    }, 
+    {
+        "ParameterKey": "PCIDRvpc",
+        "ParameterValue": "10.0.0.0/16"
+    },
+    {
+        "ParameterKey": "PCIDRpublicsubnet01",
+        "ParameterValue": "10.0.1.0/24"
+    }, 
+    {
+        "ParameterKey": "PCIDRpublicsubnet02",
+        "ParameterValue": "10.0.2.0/24"
+    }, 
+    {
+        "ParameterKey": "PCIDRprivatesubnet01",
+        "ParameterValue": "10.0.3.0/24"
+    }, 
+    {
+        "ParameterKey": "PCIDRprivatesubnet02",
+        "ParameterValue": "10.0.4.0/24"
+    }
+]

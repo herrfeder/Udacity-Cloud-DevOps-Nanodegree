@@ -1,0 +1,14 @@
+[
+    {
+        "ParameterKey": "EnvironmentName",
+        "ParameterValue": "udacityIACproject"
+    }, 
+    {
+        "ParameterKey": "PS3BucketName",
+        "ParameterValue": "udacity-demo-1"
+    },
+    {
+        "ParameterKey": "PS3Filepath",
+        "ParameterValue": "udacity.zip"
+    } 
+]
