@@ -38,7 +38,8 @@ Resources:
   PROFILES3Instance:
     Type: AWS::IAM::InstanceProfile
     Properties: 
-       Roles:
+      Path: / 
+      Roles:
          - Ref: ROLES3ReadOnlyEC2
 
 
@@ -89,8 +90,7 @@ Resources:
     Properties:
       GroupDescription: Allow Ingress http and Egress http
       VpcId: 
-        Fn::ImportValue: 
-          !Sub "${EnvironmentName}-VPCHAWebApp"
+        Fn::ImportValue: !Sub "${EnvironmentName}-VPCHAWebApp"
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -119,8 +119,7 @@ Resources:
       Port: 80
       Protocol: HTTP
       VpcId: 
-        Fn::ImportValue: 
-          !Sub "${EnvironmentName}-VPCHAWebApp"
+        Fn::ImportValue: !Sub "${EnvironmentName}-VPCHAWebApp"
 
 
   LOADBALANCERWebApp:
@@ -139,9 +138,9 @@ Resources:
       DefaultActions:
         - Type: forward
           TargetGroupArn: 
-            - Ref: TARGETGROUPWebApp
+            Ref: TARGETGROUPWebApp
       LoadBalancerArn: 
-        - Ref: LOADBALANCERWebApp
+        Ref: LOADBALANCERWebApp
       Port: 80
       Protocol: HTTP
   
@@ -152,12 +151,12 @@ Resources:
       Actions: 
         - Type: forward
           TargetGroupArn:
-            - Ref: TARGETGROUPWebApp
+            Ref: TARGETGROUPWebApp
       Conditions:
         - Field: path-pattern
           Values: [/]
       ListenerArn:
-        - Ref: LISTENERWebApp
+        Ref: LISTENERWebApp
       Priority: 1
 
 
@@ -165,37 +164,53 @@ Resources:
   # INSTANCE/AUTOSCALING ##
   #########################
 
+  # test machine for investigating userdata success
+
+  #EC2Instance: 
+    #Type: AWS::EC2::Instance
+    #Properties: 
+      #UserData:
+        #Fn::Base64: !Sub |
+          #!/bin/bash
+          #exec > >(tee /var/log/cloud-init-output.log | logger -t cloud-init-output -s 2>/dev/console) 2>&1
+          #apt-get update -y
+          #apt-get install unzip awscli -y
+          #apt-get install apache2 -y
+          #aws s3 cp --region us-west-2 s3://${PS3BucketName}/${PS3Filepath} .
+          #sudo unzip -o ${PS3Filepath} -d /var/www/html/
+      #ImageId: ami-898dd9b9
+      #InstanceType: t2.medium
+      #KeyName: ssh_access
+      #IamInstanceProfile:
+        #Ref: PROFILES3Instance
+      #NetworkInterfaces: 
+      #- AssociatePublicIpAddress: "true"
+        #DeviceIndex: "0"
+
+
   LAUNCHCONFIGWebApp: 
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
+          exec > >(tee /var/log/cloud-init-output.log | logger -t cloud-init-output -s 2>/dev/console) 2>&1
           apt-get update -y
+          apt-get install unzip awscli -y
           apt-get install apache2 -y
           systemctl start apache2.service
-          cd /var/www/html
-          aws s3 cp s3://${PS3BucketName}/${PS3Filepath} .
-          unzip -o ${PS3Filepath}
-      # Amazon Linux 2 AMI (HVM), SSD Volume Type (64-bit x86)
+          aws s3 cp --region us-west-2 s3://${PS3BucketName}/${PS3Filepath} .
+          sudo unzip -o ${PS3Filepath} -d /var/www/html/
       ImageId: ami-898dd9b9
-      # t2.medium
       InstanceType: t2.medium
-      #KeyName: platforms-key
       IamInstanceProfile:
         Ref: PROFILES3Instance
       SecurityGroups:
         - Ref: SECGROUPWebServer
       BlockDeviceMappings:
-        - DeviceName: "/dev/sda"
+        - DeviceName: "/dev/sdf"
           Ebs:
              VolumeSize: '10'
-
-
-  SNSTOPICautoscaling:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: "AutoscalingEvents"
 
 
   AUTOSCALINGGROUPWebApp:
@@ -207,15 +222,6 @@ Resources:
         Ref: LAUNCHCONFIGWebApp
       MinSize: '2'
       MaxSize: '5'
-      NotificationConfigurations:
-        TopicARN:
-          - Ref: SNSTOPICautoscaling
-      NotificationTypes:
-        - autoscaling:EC2INSTANCELAUNCH
-        - autoscaling:EC2INSTANCELAUNCHERROR
-        - autoscaling:EC2INSTANCETERMINATE
-        - autoscaling:EC2INSTANCETERMINATEERROR
-        - autoscaling:TESTNOTIFICATION
       TargetGroupARNs:
         - Ref: TARGETGROUPWebApp
 
