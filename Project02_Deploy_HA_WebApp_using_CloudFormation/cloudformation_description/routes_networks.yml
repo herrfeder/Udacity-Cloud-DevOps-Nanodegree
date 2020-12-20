@@ -280,7 +280,7 @@ Outputs:
     Value: 
       Ref: SUBNETpublic02
     Export:
-      Name: !Sub ${EnvironmentName}-SUBNETpublic2
+      Name: !Sub ${EnvironmentName}-SUBNETpublic02
       
       
  

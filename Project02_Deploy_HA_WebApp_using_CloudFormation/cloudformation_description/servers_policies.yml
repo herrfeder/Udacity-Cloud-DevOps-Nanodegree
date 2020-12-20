@@ -127,7 +127,8 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Subnets: 
-        - Fn::ImportValue: !Sub "${EnvironmentName}-SUBNETSpublic"
+        - Fn::ImportValue: !Sub "${EnvironmentName}-SUBNETpublic01"
+        - Fn::ImportValue: !Sub "${EnvironmentName}-SUBNETpublic02"
       SecurityGroups:
         - Ref: SECGROUPLoadBalancer
  
@@ -177,12 +178,12 @@ Resources:
           aws s3 cp s3://${PS3BucketName}/${PS3Filepath} .
           unzip -o ${PS3Filepath}
       # Amazon Linux 2 AMI (HVM), SSD Volume Type (64-bit x86)
-      ImageId: ami-0bd39c806c2335b95
+      ImageId: ami-898dd9b9
       # t2.medium
       InstanceType: t2.medium
       #KeyName: platforms-key
       IamInstanceProfile:
-        - Ref: PROFILES3Instance
+        Ref: PROFILES3Instance
       SecurityGroups:
         - Ref: SECGROUPWebServer
       BlockDeviceMappings:
