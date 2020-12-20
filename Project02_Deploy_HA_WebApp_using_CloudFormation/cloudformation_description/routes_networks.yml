@@ -126,7 +126,7 @@ Resources:
   NATGW01: 
     Type : AWS::EC2::NatGateway
     Properties: 
-      All ocationId: !GetAtt EIPNATGateway01.AllocationId
+      AllocationId: !GetAtt EIPNATGateway01.AllocationId
       SubnetId:
         Ref: SUBNETpublic01
 
@@ -153,7 +153,7 @@ Resources:
     Type : AWS::EC2::Route
     DependsOn: VPCGWATTA01
     Properties: 
-      Rou teTableId:
+      RouteTableId:
         Ref: ROUTETABLEpublic01
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId:
@@ -261,6 +261,26 @@ Outputs:
       Ref: SUBNETprivate02
     Export:
       Name: !Sub ${EnvironmentName}-SUBNETprivate02
+          
+  OSUBNETSpublic:
+    Description: Output for List of public subnets
+    Value: !Join [",", [ !Ref SUBNETpublic01, !Ref SUBNETpublic02 ]]
+    Export:
+      Name: !Sub ${EnvironmentName}-SUBNETSpublic
+
+  OSUBNETpublic01:
+    Description: Output for public subnet in 1st availability zone
+    Value: 
+      Ref: SUBNETpublic01
+    Export:
+      Name: !Sub ${EnvironmentName}-SUBNETpublic01
+
+  OSUBNETpublic02:
+    Description: Output for public subnet in 2nd availability zone
+    Value: 
+      Ref: SUBNETpublic02
+    Export:
+      Name: !Sub ${EnvironmentName}-SUBNETpublic2
       
       
  

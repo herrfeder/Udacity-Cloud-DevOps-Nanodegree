@@ -19,7 +19,22 @@ Resources:
   #########################
   ##### POLICY/PROFILE ####
   #########################
-
+  
+  ROLES3ReadOnlyEC2:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: 
+        !Sub ${EnvironmentName}-S3role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: ec2.amazonaws.com
+          Action: sts:AssumeRole
+      Path: /
+  
+ 
   PROFILES3Instance:
     Type: AWS::IAM::InstanceProfile
     Properties: 
@@ -27,33 +42,19 @@ Resources:
          - Ref: ROLES3ReadOnlyEC2
 
 
-  ROLES3ReadOnlyEC2:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: 
-        !Sub ${EnvironmentName}S3role
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-        - Effect: Allow
-          Principal:
-            Service:
-            - ec2.amazonaws.com
-          Action:
-          - sts:AssumeRole
-        Path: "/"
-        Policies:
-          - PolicyName: POLICYS3ReadOnly
-            PolicyDocument:
-              Version: 2012-10-17
-              Statement:
-                - Effect: Allow
-                  Action: 
-                    - s3:Get*
-                    - s3:List*
-                  Resource: 
-                    - arn:aws:s3:::${PS3BucketName}
-                    - arn:aws:s3:::${PS3BucketName}/*
+  POLICYS3ReadOnly:
+    Type: AWS::IAM::Policy
+    Properties: 
+      PolicyName: POLICYS3ReadOnly
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement: 
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource: "*"
+      Roles: 
+        - Ref: ROLES3ReadOnlyEC2
 
 
   #########################
@@ -109,10 +110,10 @@ Resources:
   TARGETGROUPWebApp:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      HealthCheckIntervalSeconds: 10
+      HealthCheckIntervalSeconds: 20
       HealthCheckPath: /
       HealthCheckProtocol: HTTP
-      HealthCheckTimeoutSeconds: 20
+      HealthCheckTimeoutSeconds: 10
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 5
       Port: 80
@@ -126,8 +127,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Subnets: 
-        Fn::ImportValue: 
-          !Sub "${EnvironmentName}-SUBNETSprivate"
+        - Fn::ImportValue: !Sub "${EnvironmentName}-SUBNETSpublic"
       SecurityGroups:
         - Ref: SECGROUPLoadBalancer
  
@@ -171,7 +171,6 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           apt-get update -y
-          apt-get install unzip awscli -y
           apt-get install apache2 -y
           systemctl start apache2.service
           cd /var/www/html
@@ -202,8 +201,7 @@ Resources:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       VPCZoneIdentifier: 
-        Fn::ImportValue: 
-          !Sub "${EnvironmentName}SUBNETSprivate"
+        - Fn::ImportValue: !Sub "${EnvironmentName}-SUBNETSprivate"
       LaunchConfigurationName:
         Ref: LAUNCHCONFIGWebApp
       MinSize: '2'
